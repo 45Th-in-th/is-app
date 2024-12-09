@@ -80,7 +80,7 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
     })
 
 # การตั้งค่าหน้า Streamlit
-st.set_page_config(page_title="Chat with MySQL", page_icon=":speech_balloon:", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Chat AI จาก Tucoop (MySQL)", page_icon=":speech_balloon:", initial_sidebar_state="expanded")
 
 # Session State Initialization
 if "chat_history" not in st.session_state:
@@ -91,7 +91,7 @@ if "chat_history" not in st.session_state:
 if "db" not in st.session_state:
     st.session_state.db = None
 
-st.title("Chat with MySQL")
+st.title("Chat กับสหกรณ์")
 
 # Sidebar สำหรับการตั้งค่าการเชื่อมต่อฐานข้อมูล
 with st.sidebar:
