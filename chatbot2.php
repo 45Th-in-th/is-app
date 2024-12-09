@@ -1,27 +1,66 @@
 <?php
-// กำหนดส่วนหัวให้ส่งข้อมูลเป็น JSON
 header('Content-Type: application/json');
 
-// รับข้อมูลที่ส่งมาจาก JavaScript
+// รับข้อมูล JSON จาก JavaScript
 $request = json_decode(file_get_contents('php://input'), true);
+$message = $request['message'] ?? '';
+$jsonData = $request['jsonData'] ?? [];
 
-// ตรวจสอบข้อความและสร้างการตอบกลับแบบง่าย
-if (isset($request['message'])) {
-    $userMessage = strtolower(trim($request['message']));
-    $responseMessage = "";
+// ฟังก์ชันค้นหาคำตอบใน JSON
+function findAnswer($data, $message) {
+    $results = []; // เก็บข้อความทั้งหมดที่ตรงกัน
 
-    // ตอบข้อความตามข้อความที่ผู้ใช้ส่งมา
-    if ($userMessage == "สวัสดี" || $userMessage == "สวัสดี") {
-        $responseMessage = "สวัสดีครับ วันนี้มีอะไรให้ผมช่วยครับ?";
-    } elseif ($userMessage == "คุณสบายดีไหม" || $userMessage == "สบายดีไหม") {
-        $responseMessage = "ผมเป็น chatbot วันนี้ผมสบายดี!";
-    } else {
-        $responseMessage = "ขอโทษครับ ผมไม่เข้าใจคำถามคุณ?";
+    // แยกข้อความของผู้ใช้เป็นคำ ๆ เพื่อค้นหา
+    $keywords = array_filter(explode(' ', $message), fn($word) => !empty(trim($word))); // ตัดคำที่ว่างเปล่าออก
+
+    foreach ($data as $entry) {
+        $matchedKeywords = []; // เก็บคำที่ตรงกันใน entry นี้
+
+        // ตรวจสอบฟิลด์ทุกฟิลด์ของ JSON
+        foreach ($entry as $field => $value) {
+            if (is_string($value)) {
+                foreach ($keywords as $keyword) {
+                    if (stripos($value, $keyword) !== false) {
+                        $matchedKeywords[] = $keyword; // เก็บคำที่ตรงกัน
+                    }
+                }
+            }
+        }
+
+        // หากพบคำที่ตรงใน entry นี้ ให้บันทึกพร้อมจำนวนคำที่ตรงกัน
+        if (!empty($matchedKeywords)) {
+            $results[] = [
+                'page' => $entry['page'] ?? 'N/A',
+                'line' => $entry['line'] ?? 'N/A',
+                'description' => $entry['description'] ?? 'N/A',
+                'matched_keywords' => $matchedKeywords,
+                'match_count' => count($matchedKeywords) // นับจำนวนคำที่ตรงกัน
+            ];
+        }
     }
 
-    // ส่งการตอบกลับกลับไป
-    echo json_encode(['reply' => $responseMessage]);
-} else {
-    echo json_encode(['reply' => "No message received."]);
+    // จัดเรียงผลลัพธ์ตามจำนวนคำที่ตรงกัน (มากไปน้อย)
+    usort($results, function ($a, $b) {
+        return $b['match_count'] - $a['match_count'];
+    });
+
+    return $results;
 }
+
+// เรียกใช้ฟังก์ชันค้นหา
+$searchResults = findAnswer($jsonData, $message);
+
+// สร้างคำตอบ
+if (!empty($searchResults)) {
+    $response = "พบข้อมูลดังนี้ (เรียงตามจำนวนคำที่ตรงกันมากที่สุด):\n";
+    foreach ($searchResults as $result) {
+        $response .= "- [Page: {$result['page']}, Line: {$result['line']}] คำที่พบ: " . implode(', ', $result['matched_keywords']) . "\n";
+        $response .= "  ข้อความ: {$result['description']} (จำนวนคำที่ตรงกัน: {$result['match_count']})\n";
+    }
+} else {
+    $response = "ขอโทษครับ ผมไม่พบข้อมูลที่คุณต้องการ";
+}
+
+// ส่งคำตอบกลับ
+echo json_encode(['reply' => $response]);
 ?>

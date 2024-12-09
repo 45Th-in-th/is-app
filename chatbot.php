@@ -1,45 +1,77 @@
 <?php
-// กำหนดส่วนหัวให้ส่งข้อมูลเป็น JSON
 header('Content-Type: application/json');
 
-// รับข้อมูลที่ส่งมาจาก JavaScript
+// รับข้อมูล JSON จาก JavaScript
 $request = json_decode(file_get_contents('php://input'), true);
+$message = $request['message'] ?? '';
+$jsonData = $request['jsonData'] ?? [];
 
-// ฟังก์ชันสำหรับโหลดข้อความจาก JSON ไฟล์
-function loadResponses($folderPath) {
-    $responses = [];
-    $files = glob($folderPath . '/*.json'); // ดึงรายชื่อไฟล์ JSON ทั้งหมดในโฟลเดอร์
+// ฟังก์ชันค้นหาคำตอบใน JSON
+function findAnswer($data, $message) {
+    $results = []; // เก็บข้อความทั้งหมดที่ตรงกัน
 
-    foreach ($files as $file) {
-        $jsonData = json_decode(file_get_contents($file), true);
-        if ($jsonData) {
-            $responses = array_merge($responses, $jsonData); // รวมข้อมูล JSON จากทุกไฟล์
+    // แยกข้อความของผู้ใช้เป็นคำ ๆ เพื่อค้นหา
+    $keywords = array_filter(explode(' ', $message), fn($word) => !empty(trim($word))); // ตัดคำที่ว่างเปล่าออก
+    $totalKeywords = count($keywords);
+
+    foreach ($data as $entry) {
+        $matchedKeywords = []; // เก็บคำที่ตรงกันใน entry นี้
+
+        // ตรวจสอบฟิลด์ทุกฟิลด์ของ JSON
+        foreach ($entry as $field => $value) {
+            if (is_string($value)) {
+                foreach ($keywords as $keyword) {
+                    if (stripos($value, $keyword) !== false) {
+                        $matchedKeywords[] = $keyword; // เก็บคำที่ตรงกัน
+                    }
+                }
+            }
+        }
+
+        // หากพบคำที่ตรงใน entry นี้ ให้บันทึกพร้อมจำนวนคำที่ตรงกัน
+        if (!empty($matchedKeywords)) {
+            $results[] = [
+                'page' => $entry['page'] ?? 'N/A',
+                'line' => $entry['line'] ?? 'N/A',
+                'description' => $entry['description'] ?? 'N/A',
+                'matched_keywords' => $matchedKeywords,
+                'match_count' => count($matchedKeywords) // นับจำนวนคำที่ตรงกัน
+            ];
         }
     }
 
-    return $responses;
+    // จัดเรียงผลลัพธ์ตามจำนวนคำที่ตรงกัน (มากไปน้อย)
+    usort($results, function ($a, $b) {
+        return $b['match_count'] - $a['match_count'];
+    });
+
+    // แยกข้อความที่ตรงทั้งหมดคำ และข้อความที่ตรงบางคำ
+    $exactMatches = array_filter($results, fn($result) => $result['match_count'] === $totalKeywords);
+    $partialMatches = array_filter($results, fn($result) => $result['match_count'] < $totalKeywords);
+
+    // หากมีข้อความที่ตรงทั้งหมดคำ ให้แสดงทั้งหมด
+    if (!empty($exactMatches)) {
+        return $exactMatches;
+    }
+
+    // หากไม่มีข้อความที่ตรงทั้งหมดคำ ให้แสดงข้อความที่ตรงบางคำ (ไม่เกิน 7 ข้อความ)
+    return array_slice($partialMatches, 0, 5);
 }
 
-// โหลดข้อความตอบกลับจากโฟลเดอร์
-$responseFolder = __DIR__ . '/data/การบริหาร/พรบ'; // ระบุเส้นทางไปยังโฟลเดอร์ JSON
-$responses = loadResponses($responseFolder);
+// เรียกใช้ฟังก์ชันค้นหา
+$searchResults = findAnswer($jsonData, $message);
 
-// ตรวจสอบข้อความและสร้างการตอบกลับ
-if (isset($request['message'])) {
-    $userMessage = strtolower(trim($request['message'])); // ข้อความจากผู้ใช้
-    $responseMessage = "ขอโทษครับ ผมไม่เข้าใจคำถามของคุณ"; // ข้อความเริ่มต้น
-
-    // ค้นหาคำตอบใน JSON
-    foreach ($responses as $key => $value) {
-        if (strpos($userMessage, $key) !== false) {
-            $responseMessage = $value; // หากพบคำตอบใน JSON
-            break;
-        }
+// สร้างคำตอบ
+if (!empty($searchResults)) {
+    $response = "พบข้อมูลดังนี้:\n";
+    foreach ($searchResults as $result) {
+        $response .= "- [Page: {$result['page']}, Line: {$result['line']}] คำที่พบ: " . implode(', ', $result['matched_keywords']) . "\n";
+        $response .= "  ข้อความ: {$result['description']} (จำนวนคำที่ตรงกัน: {$result['match_count']})\n";
     }
-
-    // ส่งการตอบกลับกลับไป
-    echo json_encode(['reply' => $responseMessage]);
 } else {
-    echo json_encode(['reply' => "No message received."]);
+    $response = "ขอโทษครับ ผมไม่พบข้อมูลที่คุณต้องการ";
 }
+
+// ส่งคำตอบกลับ
+echo json_encode(['reply' => $response]);
 ?>

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,18 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>สอมธ. Chatbot</title>
     <link rel="stylesheet" href="css/style.css">
+   
 </head>
 <body>
+
 <div class="chat-container">
-<div class="header">
-    <img src="images/Logo.png" alt="Logo" class="logo">
-    <h2>สอมธ. Chatbot</h2>
-    <div class="file-selector-container">
+    <div class="header">
+        <img src="images/Logo.png" alt="Logo" class="logo">
+        <h2>สอมธ. Chatbot</h2>
         <button id="choose-json-btn" class="choose-json-btn">เลือกไฟล์ JSON</button>
-        <span id="json-file-name" class="json-file-name">ยังไม่ได้เลือกไฟล์</span>
         <input type="file" id="json-file-input" accept=".json" style="display: none;" />
+        <span id="json-file-name" class="json-file-name">ยังไม่ได้เลือกไฟล์</span>
     </div>
-</div>
     <div id="chat-box" class="chat-box"></div>
     <div class="input-container">
         <input type="text" id="user-input" placeholder="พิมพ์คำถามของท่าน...">
@@ -46,7 +47,7 @@
 
     jsonFileInput.addEventListener("change", (event) => {
         const file = event.target.files[0];
-        if (file && file.type === "application/json") {
+        if (file) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
@@ -63,48 +64,19 @@
             };
             reader.readAsText(file);
         } else {
-            jsonFileName.textContent = "ยังไม่ได้เลือกไฟล์ หรือไฟล์ที่เลือกไม่ใช่ JSON";
+            jsonFileName.textContent = "ยังไม่ได้เลือกไฟล์"; // กรณีไม่ได้เลือกไฟล์
         }
     });
 
- // ฟังก์ชันแสดงคำแนะนำคำถาม
-const displaySuggestedQuestions = (jsonData) => {
-    suggestedQuestions.innerHTML = ""; // ล้างรายการเก่า
-
-    const keywordCounts = {}; // เก็บจำนวนการปรากฏของแต่ละ keyword
-
-    // วนลูปอ่าน JSON และนับจำนวนการปรากฏของแต่ละ keyword
-    jsonData.forEach((entry) => {
-        const keywords = entry.keyword.split(", "); // แยก keyword ในกรณีมีหลายคำ
-        keywords.forEach((keyword) => {
-            if (keywordCounts[keyword]) {
-                keywordCounts[keyword]++;
-            } else {
-                keywordCounts[keyword] = 1;
-            }
+    // ฟังก์ชันแสดงคำแนะนำคำถาม
+    const displaySuggestedQuestions = (jsonData) => {
+        suggestedQuestions.innerHTML = ""; // ล้างรายการเก่า
+        Object.keys(jsonData).forEach((keyword) => {
+            const li = document.createElement("li");
+            li.textContent = `ลองถามเกี่ยวกับ "${keyword}"`;
+            suggestedQuestions.appendChild(li);
         });
-    });
-
-    // จัดเรียง keyword ตามจำนวนครั้งที่พบ (จากมากไปน้อย)
-    const sortedKeywords = Object.entries(keywordCounts)
-        .sort((a, b) => b[1] - a[1]) // จัดเรียงตามจำนวน
-        .slice(0, 5); // เอาเฉพาะ 5 คำแรก
-
-    if (sortedKeywords.length === 0) {
-        const li = document.createElement("li");
-        li.textContent = "ไม่มีคำแนะนำที่จะแสดง";
-        suggestedQuestions.appendChild(li);
-        return;
-    }
-
-    // แสดงคำแนะนำ
-    sortedKeywords.forEach(([keyword, count]) => {
-        const li = document.createElement("li");
-        li.textContent = `ลองถามเกี่ยวกับ "${keyword}" (พบ ${count} ครั้ง)`;
-        suggestedQuestions.appendChild(li);
-    });
-};
-
+    };
 
     // ฟังก์ชันส่งข้อความ
     const sendMessage = () => {
@@ -142,17 +114,14 @@ const displaySuggestedQuestions = (jsonData) => {
             return;
         }
 
-        fetch("chatbot.php", {
+        fetch("chatbot3.php", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({ message: userMessage, jsonData: currentJsonData }),
         })
-            .then((response) => {
-                if (!response.ok) throw new Error("Network response was not ok");
-                return response.json();
-            })
+            .then((response) => response.json())
             .then((data) => {
                 addMessage(data.reply, "bot-message");
             })
