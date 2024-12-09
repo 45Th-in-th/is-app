@@ -6,7 +6,7 @@ from langchain_community.utilities import SQLDatabase
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-import os
+
 # โหลด Environment Variables
 load_dotenv()
 
@@ -82,32 +82,40 @@ def get_response(user_query: str, db: SQLDatabase, chat_history: list):
 # การตั้งค่าหน้า Streamlit
 st.set_page_config(page_title="Chat AI จาก Tucoop (MySQL)", page_icon=":speech_balloon:", initial_sidebar_state="expanded")
 
-# ตั้งค่าการเชื่อมต่อฐานข้อมูล
-
-host = os.getenv("DB_HOST")
-port = os.getenv("DB_PORT")
-user = os.getenv("DB_USER")
-password = os.getenv("DB_PASSWORD")
-database = os.getenv("DB_NAME")
-
-# พยายามเชื่อมต่อกับฐานข้อมูล
-if "db" not in st.session_state:
-    st.session_state.db = None
-
-try:
-    db = init_database(user, password, host, port, database)
-    st.session_state.db = db
-    st.success("Connected to the database!")
-except Exception as e:
-    st.error(f"Failed to connect to database: {e}")
-
 # Session State Initialization
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
         AIMessage(content="Hello! I'm a chatbot that can help you with your SQL queries. Ask me anything about your database!")
     ]
 
+if "db" not in st.session_state:
+    st.session_state.db = None
+
 st.title("Chat กับสหกรณ์")
+
+# Sidebar สำหรับการตั้งค่าการเชื่อมต่อฐานข้อมูล
+with st.sidebar:
+    st.title("Database Connection")
+    host = st.text_input("Host", value="203.131.211.13", key="Host")
+    port = st.text_input("Port", value="3306", key="Port")
+    user = st.text_input("User", value="chatbot", key="User")
+    password = st.text_input("Password", type="password", value="password", key="Password")
+    database = st.text_input("Database", value="chatbot", key="Database")
+
+    if st.button("Connect"):
+        with st.spinner("Connecting to the database..."):
+            # แสดง Connection String
+            connection_string = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{database}"
+            st.text(f"Connection String: {connection_string}")
+            try:
+                # ลองสร้างการเชื่อมต่อ
+                db = init_database(user, password, host, port, database)
+                st.session_state.db = db
+                st.success("Connected to the database!")
+            except Exception as e:
+                # แสดงข้อความ error และ connection string
+                st.error(f"Failed to connect to database: {e}")
+                st.text(f"Connection String: {connection_string}")
 
 # รับคำถามจากผู้ใช้
 user_query = st.chat_input("Type your SQL-related question here...")
@@ -139,4 +147,4 @@ if user_query:
                 st.error(f"Error: {e}")
     else:
         with st.chat_message("AI"):
-            st.error("Database connection failed. Please check the configuration!")
+            st.error("Please connect to a database first!")
